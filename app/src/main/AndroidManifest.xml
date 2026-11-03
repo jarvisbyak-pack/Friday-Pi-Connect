@@ -5,7 +5,7 @@
 
     <application
         android:theme="@style/AppTheme"
-        android:label="Friday TV"
+        android:label="AK PACK SERVER"
         android:usesCleartextTraffic="false"
         android:banner="@android:drawable/sym_def_app_icon">
         <activity
