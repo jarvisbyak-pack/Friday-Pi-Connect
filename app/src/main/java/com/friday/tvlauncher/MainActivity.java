@@ -250,7 +250,8 @@ public class MainActivity extends Activity {
         Intent query = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LEANBACK_LAUNCHER);
         List<ResolveInfo> apps = pm.queryIntentActivities(query, 0);
         if (apps.isEmpty()) {
-            query.removeCategory(Intent.CATEGORY_LEANBACK_LAUNCHER).addCategory(Intent.CATEGORY_LAUNCHER);
+            query.removeCategory(Intent.CATEGORY_LEANBACK_LAUNCHER);
+            query.addCategory(Intent.CATEGORY_LAUNCHER);
             apps = pm.queryIntentActivities(query, 0);
         }
         final List<ResolveInfo> list = new ArrayList<>();
