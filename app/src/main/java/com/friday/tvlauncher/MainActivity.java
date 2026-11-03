@@ -1,7 +1,7 @@
 package com.friday.tvlauncher;
 
 import android.app.Activity;
-import android.content.ActivityNotFoundException;
+import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
@@ -10,11 +10,11 @@ import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.os.Handler;
-import android.provider.Settings;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.HorizontalScrollView;
 import android.widget.ImageView;
@@ -31,221 +31,232 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 
-/** Lightweight, remote-first Friday home screen. Uses platform widgets only. */
+/** Minimal premium AK PACK TV home. Native Android views keep memory use low. */
 public class MainActivity extends Activity {
-    private static final int BG = Color.rgb(7, 10, 17);
-    private static final int PANEL = Color.argb(174, 27, 34, 49);
-    private static final int PANEL_FOCUS = Color.rgb(49, 58, 78);
-    private static final int WHITE = Color.rgb(247, 248, 252);
-    private static final int MUTED = Color.rgb(164, 174, 194);
-    private static final int ACCENT = Color.rgb(196, 158, 255);
+    private static final int BG = Color.rgb(247, 246, 243);
+    private static final int RED = Color.rgb(210, 25, 43);
+    private static final int INK = Color.rgb(27, 28, 31);
+    private static final int MUTED = Color.rgb(117, 117, 121);
+    private static final int CARD = Color.WHITE;
     private final Handler handler = new Handler();
-    private final SimpleDateFormat clockFormat = new SimpleDateFormat("h:mm", Locale.getDefault());
-    private final SimpleDateFormat dateFormat = new SimpleDateFormat("EEEE, d MMMM", Locale.getDefault());
-    private TextView clockText;
-    private TextView dateText;
-    private LinearLayout dock;
-    private final Set<String> preferred = new HashSet<>();
-    private final String[] preferredPackages = {
-        "com.google.android.youtube.tv", "com.netflix.ninja",
-        "com.amazon.amazonvideo.livingroom", "com.spotify.tv.android",
-        "com.disneyplus.mea", "com.ezviz.tv", "com.ubnt.unifi.protect"
+    private final SimpleDateFormat timeFormat = new SimpleDateFormat("h:mm", Locale.getDefault());
+    private final SimpleDateFormat dayFormat = new SimpleDateFormat("EEEE", Locale.getDefault());
+    private final SimpleDateFormat fullDateFormat = new SimpleDateFormat("d MMMM yyyy", Locale.getDefault());
+    private TextView clock;
+    private TextView day;
+    private TextView fullDate;
+    private final String[] priorityPackages = {
+        "com.google.android.youtube.tv",
+        "com.netflix.ninja",
+        "com.amazon.amazonvideo.livingroom",
+        "com.spotify.tv.android",
+        "com.disneyplus.mea",
+        "com.ubnt.unifi.protect"
     };
-    private final Runnable clockTick = new Runnable() {
+    private final Runnable tick = new Runnable() {
         @Override public void run() {
             Date now = new Date();
-            if (clockText != null) clockText.setText(clockFormat.format(now));
-            if (dateText != null) dateText.setText(dateFormat.format(now));
-            handler.postDelayed(this, 30_000L);
+            if (clock != null) clock.setText(timeFormat.format(now));
+            if (day != null) day.setText(dayFormat.format(now).toUpperCase(Locale.getDefault()));
+            if (fullDate != null) fullDate.setText(fullDateFormat.format(now));
+            handler.postDelayed(this, 15000L);
         }
     };
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
-        Collections.addAll(preferred, preferredPackages);
         getWindow().getDecorView().setSystemUiVisibility(
             View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION |
             View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY | View.SYSTEM_UI_FLAG_LAYOUT_STABLE |
             View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
         );
-        buildHome();
+        buildScreen();
     }
 
     @Override protected void onResume() {
         super.onResume();
-        handler.removeCallbacks(clockTick);
-        handler.post(clockTick);
+        handler.removeCallbacks(tick);
+        handler.post(tick);
     }
 
     @Override protected void onPause() {
-        handler.removeCallbacks(clockTick);
+        handler.removeCallbacks(tick);
         super.onPause();
     }
 
-    private int dp(float value) { return (int) (value * getResources().getDisplayMetrics().density + 0.5f); }
-    private GradientDrawable shape(int color, int radiusDp, int strokeColor) {
-        GradientDrawable d = new GradientDrawable(
-            GradientDrawable.Orientation.TOP_BOTTOM,
-            new int[] { color, blend(color, 0xFF080B13, 0.12f) }
-        );
-        d.setCornerRadius(dp(radiusDp));
-        if (strokeColor != 0) d.setStroke(dp(1), strokeColor);
+    private int dp(float n) {
+        return (int) (n * getResources().getDisplayMetrics().density + 0.5f);
+    }
+
+    private GradientDrawable rounded(int color, int radius, int stroke) {
+        GradientDrawable d = new GradientDrawable();
+        d.setColor(color);
+        d.setCornerRadius(dp(radius));
+        if (stroke != 0) d.setStroke(dp(1), stroke);
         return d;
     }
-    private int blend(int from, int to, float amount) {
-        return Color.rgb(
-            (int)(Color.red(from) * (1 - amount) + Color.red(to) * amount),
-            (int)(Color.green(from) * (1 - amount) + Color.green(to) * amount),
-            (int)(Color.blue(from) * (1 - amount) + Color.blue(to) * amount)
-        );
-    }
-    private TextView text(String value, int size, int color, boolean bold) {
+
+    private TextView label(String value, int size, int color, boolean bold) {
         TextView t = new TextView(this);
-        t.setText(value); t.setTextColor(color); t.setTextSize(size);
+        t.setText(value);
+        t.setTextSize(size);
+        t.setTextColor(color);
         t.setIncludeFontPadding(false);
         if (bold) t.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
         return t;
     }
-    private LinearLayout column() {
-        LinearLayout l = new LinearLayout(this); l.setOrientation(LinearLayout.VERTICAL); return l;
-    }
-    private LinearLayout.LayoutParams lp(int w, int h) { return new LinearLayout.LayoutParams(w, h); }
 
-    private void buildHome() {
-        FrameLayout canvas = new FrameLayout(this);
-        GradientDrawable backdrop = new GradientDrawable(
+    private LinearLayout column() {
+        LinearLayout l = new LinearLayout(this);
+        l.setOrientation(LinearLayout.VERTICAL);
+        return l;
+    }
+
+    private LinearLayout.LayoutParams lp(int w, int h) {
+        return new LinearLayout.LayoutParams(w, h);
+    }
+
+    private void buildScreen() {
+        FrameLayout root = new FrameLayout(this);
+        root.setBackgroundColor(BG);
+
+        View redOrb = new View(this);
+        GradientDrawable orb = new GradientDrawable(
             GradientDrawable.Orientation.TL_BR,
-            new int[] { 0xFF172238, 0xFF171725, BG }
+            new int[] { 0x20D2192B, 0x00D2192B }
         );
-        canvas.setBackground(backdrop);
-        LinearLayout layout = new LinearLayout(this);
-        layout.setOrientation(LinearLayout.HORIZONTAL);
-        layout.setPadding(dp(34), dp(24), dp(24), dp(24));
-        canvas.addView(layout, new FrameLayout.LayoutParams(-1, -1));
+        orb.setShape(GradientDrawable.OVAL);
+        redOrb.setBackground(orb);
+        FrameLayout.LayoutParams orbParams = new FrameLayout.LayoutParams(dp(470), dp(470), Gravity.RIGHT | Gravity.TOP);
+        orbParams.rightMargin = dp(170);
+        orbParams.topMargin = dp(-250);
+        root.addView(redOrb, orbParams);
+
+        LinearLayout page = new LinearLayout(this);
+        page.setOrientation(LinearLayout.HORIZONTAL);
+        page.setPadding(dp(54), dp(34), dp(42), dp(32));
+        root.addView(page, new FrameLayout.LayoutParams(-1, -1));
 
         LinearLayout main = column();
         LinearLayout.LayoutParams mainParams = new LinearLayout.LayoutParams(0, -1, 1f);
-        mainParams.rightMargin = dp(22);
-        layout.addView(main, mainParams);
+        mainParams.rightMargin = dp(54);
+        page.addView(main, mainParams);
 
-        LinearLayout header = new LinearLayout(this);
-        header.setGravity(Gravity.CENTER_VERTICAL);
-        TextView brand = text("FRIDAY", 18, WHITE, true);
-        header.addView(brand, new LinearLayout.LayoutParams(0, -2, 1f));
-        TextView edition = text("TV EXPERIENCE", 10, ACCENT, true);
-        edition.setLetterSpacing(0.16f);
-        header.addView(edition);
-        main.addView(header, lp(-1, dp(34)));
+        LinearLayout brandRow = new LinearLayout(this);
+        brandRow.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout mark = new LinearLayout(this);
+        mark.setGravity(Gravity.CENTER);
+        mark.setBackground(rounded(RED, 13, 0));
+        TextView markText = label("AK", 23, Color.WHITE, true);
+        mark.addView(markText);
+        brandRow.addView(mark, lp(dp(58), dp(48)));
+
+        LinearLayout brandWords = column();
+        brandWords.setPadding(dp(13), 0, 0, 0);
+        TextView brandName = label("AK PACK", 20, INK, true);
+        brandName.setLetterSpacing(0.06f);
+        brandWords.addView(brandName);
+        TextView brandSub = label("F I T N E S S", 9, RED, true);
+        brandWords.addView(brandSub);
+        brandRow.addView(brandWords, new LinearLayout.LayoutParams(0, -2, 1f));
+
+        TextView server = label("AK PACK SERVER", 11, MUTED, true);
+        server.setLetterSpacing(0.18f);
+        server.setGravity(Gravity.CENTER_VERTICAL | Gravity.RIGHT);
+        brandRow.addView(server);
+        main.addView(brandRow, lp(-1, dp(58)));
 
         LinearLayout hero = column();
         hero.setGravity(Gravity.CENTER_VERTICAL);
         LinearLayout.LayoutParams heroParams = new LinearLayout.LayoutParams(-1, 0, 1f);
-        heroParams.topMargin = dp(12);
         main.addView(hero, heroParams);
-        TextView eyebrow = text("YOUR SPACE. YOUR ENTERTAINMENT.", 11, ACCENT, true);
-        eyebrow.setLetterSpacing(0.12f);
+
+        TextView eyebrow = label("YOUR DAY. YOUR SPACE.", 12, RED, true);
+        eyebrow.setLetterSpacing(0.22f);
         hero.addView(eyebrow);
-        TextView title = text("Good evening.", 39, WHITE, false);
-        title.setTypeface(Typeface.create("sans-serif-light", Typeface.NORMAL));
-        LinearLayout.LayoutParams titleParams = lp(-1, -2); titleParams.topMargin = dp(12);
-        hero.addView(title, titleParams);
-        TextView subtitle = text("Everything you enjoy, in one place.", 16, MUTED, false);
-        LinearLayout.LayoutParams subParams = lp(-1, -2); subParams.topMargin = dp(9);
-        hero.addView(subtitle, subParams);
 
-        LinearLayout dockHeader = new LinearLayout(this);
-        dockHeader.setGravity(Gravity.CENTER_VERTICAL);
-        TextView appsLabel = text("YOUR APPS", 12, WHITE, true);
-        appsLabel.setLetterSpacing(0.14f);
-        dockHeader.addView(appsLabel, new LinearLayout.LayoutParams(0, -2, 1f));
-        TextView hint = text("SELECT TO OPEN", 9, MUTED, true);
-        hint.setLetterSpacing(0.10f);
-        dockHeader.addView(hint);
-        main.addView(dockHeader, lp(-1, dp(25)));
+        clock = label(timeFormat.format(new Date()), 100, INK, false);
+        clock.setTypeface(Typeface.create("sans-serif-light", Typeface.NORMAL));
+        LinearLayout.LayoutParams clockParams = lp(-1, -2);
+        clockParams.topMargin = dp(17);
+        hero.addView(clock, clockParams);
 
-        HorizontalScrollView horizontal = new HorizontalScrollView(this);
-        horizontal.setHorizontalScrollBarEnabled(false);
-        horizontal.setClipToPadding(false);
-        LinearLayout.LayoutParams scrollParams = lp(-1, dp(126));
-        scrollParams.topMargin = dp(8);
-        main.addView(horizontal, scrollParams);
-        dock = new LinearLayout(this);
-        dock.setOrientation(LinearLayout.HORIZONTAL);
-        dock.setGravity(Gravity.CENTER_VERTICAL);
-        horizontal.addView(dock, new HorizontalScrollView.LayoutParams(-2, -1));
-        populateApps();
+        day = label(dayFormat.format(new Date()).toUpperCase(Locale.getDefault()), 19, INK, true);
+        day.setLetterSpacing(0.16f);
+        LinearLayout.LayoutParams dayParams = lp(-1, -2);
+        dayParams.topMargin = dp(9);
+        hero.addView(day, dayParams);
 
-        LinearLayout control = buildControlCenter();
-        LinearLayout.LayoutParams controlParams = new LinearLayout.LayoutParams(dp(242), -1);
-        layout.addView(control, controlParams);
-        setContentView(canvas);
-    }
+        fullDate = label(fullDateFormat.format(new Date()), 16, MUTED, false);
+        LinearLayout.LayoutParams dateParams = lp(-1, -2);
+        dateParams.topMargin = dp(8);
+        hero.addView(fullDate, dateParams);
 
-    private LinearLayout buildControlCenter() {
-        LinearLayout panel = column();
-        panel.setPadding(dp(18), dp(18), dp(18), dp(16));
-        panel.setBackground(shape(PANEL, 28, 0x35FFFFFF));
-        panel.setFocusable(false);
+        LinearLayout info = new LinearLayout(this);
+        info.setGravity(Gravity.CENTER_VERTICAL);
+        info.setPadding(dp(18), 0, dp(22), 0);
+        info.setBackground(rounded(Color.WHITE, 17, 0xFFEAE7E3));
+        LinearLayout.LayoutParams infoParams = lp(-1, dp(62));
+        infoParams.topMargin = dp(20);
+        hero.addView(info, infoParams);
 
-        TextView heading = text("CONTROL CENTER", 11, WHITE, true);
-        heading.setLetterSpacing(0.12f);
-        panel.addView(heading);
-        clockText = text(clockFormat.format(new Date()), 42, WHITE, false);
-        clockText.setTypeface(Typeface.create("sans-serif-light", Typeface.NORMAL));
-        LinearLayout.LayoutParams cp = lp(-1, -2); cp.topMargin = dp(22);
-        panel.addView(clockText, cp);
-        dateText = text(dateFormat.format(new Date()), 12, MUTED, false);
-        LinearLayout.LayoutParams dateParams = lp(-1, -2); dateParams.topMargin = dp(5);
-        panel.addView(dateText, dateParams);
+        View dot = new View(this);
+        dot.setBackground(rounded(RED, 20, 0));
+        info.addView(dot, lp(dp(8), dp(8)));
+        TextView infoText = label("ONE PACK. ONE STANDARD. NO SHORTCUTS.", 11, INK, true);
+        infoText.setLetterSpacing(0.08f);
+        LinearLayout.LayoutParams infoTextParams = lp(-2, -2);
+        infoTextParams.leftMargin = dp(12);
+        info.addView(infoText, infoTextParams);
 
-        View divider = new View(this); divider.setBackgroundColor(0x35FFFFFF);
-        LinearLayout.LayoutParams dividerParams = lp(-1, dp(1)); dividerParams.topMargin = dp(22); dividerParams.bottomMargin = dp(15);
-        panel.addView(divider, dividerParams);
-        TextView quick = text("QUICK SETTINGS", 10, MUTED, true);
-        quick.setLetterSpacing(0.12f);
-        panel.addView(quick);
+        TextView location = label("KODUNGALLUR  ·  KERALA", 10, MUTED, true);
+        location.setLetterSpacing(0.12f);
+        LinearLayout.LayoutParams locationParams = lp(-1, dp(28));
+        locationParams.topMargin = dp(14);
+        hero.addView(location, locationParams);
 
-        addAction(panel, "◉   Wi-Fi & Network", Settings.ACTION_WIFI_SETTINGS);
-        addAction(panel, "⌁   Bluetooth", Settings.ACTION_BLUETOOTH_SETTINGS);
-        addAction(panel, "▣   Display & Picture", Settings.ACTION_DISPLAY_SETTINGS);
-        addAction(panel, "⚙   All Settings", Settings.ACTION_SETTINGS);
+        LinearLayout side = column();
+        side.setGravity(Gravity.CENTER_HORIZONTAL);
+        side.setPadding(dp(15), dp(18), dp(15), dp(18));
+        side.setBackground(rounded(Color.WHITE, 25, 0xFFEAE7E3));
+        LinearLayout.LayoutParams sideParams = new LinearLayout.LayoutParams(dp(218), -1);
+        page.addView(side, sideParams);
 
-        View spacer = new View(this);
-        panel.addView(spacer, new LinearLayout.LayoutParams(1, 0, 1f));
-        TextView footer = text("FRIDAY  •  HOME", 9, MUTED, true);
-        footer.setLetterSpacing(0.12f);
-        panel.addView(footer);
-        return panel;
-    }
+        TextView sideTitle = label("QUICK ACCESS", 11, MUTED, true);
+        sideTitle.setLetterSpacing(0.16f);
+        side.addView(sideTitle, lp(-1, dp(28)));
 
-    private void addAction(LinearLayout parent, String label, String action) {
-        TextView button = text(label, 13, WHITE, true);
-        button.setGravity(Gravity.CENTER_VERTICAL);
-        button.setPadding(dp(12), 0, dp(8), 0);
-        button.setFocusable(true);
-        button.setClickable(true);
-        button.setBackground(shape(0x252D374A, 15, 0x20FFFFFF));
-        button.setOnFocusChangeListener((v, focused) -> {
-            v.setBackground(shape(focused ? PANEL_FOCUS : 0x252D374A, 15, focused ? ACCENT : 0x20FFFFFF));
-            v.setScaleX(focused ? 1.025f : 1f);
-            v.setScaleY(focused ? 1.025f : 1f);
+        LinearLayout apps = column();
+        apps.setGravity(Gravity.CENTER_HORIZONTAL);
+        LinearLayout.LayoutParams appsParams = new LinearLayout.LayoutParams(-1, 0, 1f);
+        appsParams.topMargin = dp(8);
+        side.addView(apps, appsParams);
+        addPriorityApps(apps);
+
+        Button allApps = new Button(this);
+        allApps.setText("ALL APPS  →");
+        allApps.setAllCaps(false);
+        allApps.setTextSize(13);
+        allApps.setTextColor(Color.WHITE);
+        allApps.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
+        allApps.setLetterSpacing(0.04f);
+        allApps.setBackground(rounded(RED, 16, 0));
+        allApps.setFocusable(true);
+        allApps.setOnFocusChangeListener((v, focused) -> {
+            v.setBackground(rounded(focused ? 0xFFAA1021 : RED, 16, focused ? 0xFF780A16 : 0));
+            v.setScaleX(focused ? 1.035f : 1f);
+            v.setScaleY(focused ? 1.035f : 1f);
         });
-        button.setOnClickListener(v -> openSettingsAction(action));
-        LinearLayout.LayoutParams params = lp(-1, dp(48));
-        params.topMargin = dp(9);
-        parent.addView(button, params);
+        allApps.setOnClickListener(v -> showAllApps());
+        LinearLayout.LayoutParams allParams = lp(-1, dp(52));
+        allParams.topMargin = dp(12);
+        side.addView(allApps, allParams);
+
+        setContentView(root);
+        allApps.setNextFocusDownId(allApps.getId());
     }
 
-    private void openSettingsAction(String action) {
-        try {
-            startActivity(new Intent(action).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
-        } catch (ActivityNotFoundException | SecurityException e) {
-            try { startActivity(new Intent(Settings.ACTION_SETTINGS)); }
-            catch (Exception ignored) { Toast.makeText(this, "Settings unavailable", Toast.LENGTH_SHORT).show(); }
-        }
-    }
-
-    private void populateApps() {
+    private List<ResolveInfo> getApps() {
         PackageManager pm = getPackageManager();
         Intent query = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LEANBACK_LAUNCHER);
         List<ResolveInfo> apps = pm.queryIntentActivities(query, 0);
@@ -254,56 +265,84 @@ public class MainActivity extends Activity {
             query.addCategory(Intent.CATEGORY_LAUNCHER);
             apps = pm.queryIntentActivities(query, 0);
         }
-        final List<ResolveInfo> list = new ArrayList<>();
+        List<ResolveInfo> result = new ArrayList<>();
         Set<String> seen = new HashSet<>();
         for (ResolveInfo ri : apps) {
             String pkg = ri.activityInfo.packageName;
-            if (pkg.equals(getPackageName()) || !seen.add(pkg)) continue;
-            list.add(ri);
+            if (!pkg.equals(getPackageName()) && seen.add(pkg)) result.add(ri);
         }
-        Collections.sort(list, (a, b) -> {
-            boolean ap = preferred.contains(a.activityInfo.packageName);
-            boolean bp = preferred.contains(b.activityInfo.packageName);
-            if (ap != bp) return ap ? -1 : 1;
-            return String.valueOf(a.loadLabel(pm)).compareToIgnoreCase(String.valueOf(b.loadLabel(pm)));
-        });
+        Collections.sort(result, (a, b) ->
+            String.valueOf(a.loadLabel(pm)).compareToIgnoreCase(String.valueOf(b.loadLabel(pm))));
+        return result;
+    }
 
-        for (int i = 0; i < list.size(); i++) {
-            ResolveInfo ri = list.get(i);
-            String pkg = ri.activityInfo.packageName;
-            LinearLayout tile = new LinearLayout(this);
-            tile.setOrientation(LinearLayout.VERTICAL);
-            tile.setGravity(Gravity.CENTER);
-            tile.setPadding(dp(8), dp(10), dp(8), dp(8));
-            tile.setBackground(shape(0x9A1B2231, 19, 0x22FFFFFF));
-            tile.setFocusable(true); tile.setClickable(true);
-            tile.setOnFocusChangeListener((v, focused) -> {
-                v.setBackground(shape(focused ? 0xE33B455B : 0x9A1B2231, 19, focused ? ACCENT : 0x22FFFFFF));
-                v.setScaleX(focused ? 1.07f : 1f); v.setScaleY(focused ? 1.07f : 1f);
-                v.setElevation(focused ? dp(8) : 0);
-            });
-            tile.setOnClickListener(v -> launch(pkg));
-            try {
-                ImageView icon = new ImageView(this);
-                icon.setImageDrawable(ri.loadIcon(pm));
-                icon.setScaleType(ImageView.ScaleType.FIT_CENTER);
-                tile.addView(icon, lp(dp(52), dp(52)));
-            } catch (Exception ignored) { }
-            TextView name = text(String.valueOf(ri.loadLabel(pm)), 11, WHITE, true);
-            name.setGravity(Gravity.CENTER);
-            name.setMaxLines(1);
-            LinearLayout.LayoutParams nameParams = lp(-1, -2); nameParams.topMargin = dp(7);
-            tile.addView(name, nameParams);
-            LinearLayout.LayoutParams tileParams = new LinearLayout.LayoutParams(dp(116), dp(104));
-            if (i > 0) tileParams.leftMargin = dp(10);
-            dock.addView(tile, tileParams);
+    private void addPriorityApps(LinearLayout parent) {
+        List<ResolveInfo> all = getApps();
+        PackageManager pm = getPackageManager();
+        int added = 0;
+        for (String pkg : priorityPackages) {
+            for (ResolveInfo ri : all) {
+                if (pkg.equals(ri.activityInfo.packageName)) {
+                    addAppTile(parent, ri, pm, false);
+                    added++;
+                    break;
+                }
+            }
+            if (added == 4) break;
         }
-        if (list.isEmpty()) {
-            TextView empty = text("No launchable apps found", 13, MUTED, false);
-            dock.addView(empty);
-        } else if (dock.getChildCount() > 0) {
-            dock.post(() -> dock.getChildAt(0).requestFocus());
+        if (added == 0) {
+            for (int i = 0; i < Math.min(4, all.size()); i++) addAppTile(parent, all.get(i), pm, false);
         }
+    }
+
+    private void addAppTile(LinearLayout parent, ResolveInfo ri, PackageManager pm, boolean compact) {
+        String pkg = ri.activityInfo.packageName;
+        LinearLayout tile = new LinearLayout(this);
+        tile.setGravity(Gravity.CENTER_VERTICAL);
+        tile.setPadding(dp(11), 0, dp(8), 0);
+        tile.setBackground(rounded(0xFFF8F7F5, 14, 0xFFEDEAE6));
+        tile.setFocusable(true);
+        tile.setClickable(true);
+        tile.setOnFocusChangeListener((v, focused) -> {
+            v.setBackground(rounded(focused ? 0xFFFFE8EB : 0xFFF8F7F5, 14, focused ? RED : 0xFFEDEAE6));
+            v.setScaleX(focused ? 1.035f : 1f);
+            v.setScaleY(focused ? 1.035f : 1f);
+        });
+        tile.setOnClickListener(v -> launch(pkg));
+        ImageView icon = new ImageView(this);
+        try { icon.setImageDrawable(ri.loadIcon(pm)); } catch (Exception ignored) { }
+        icon.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        tile.addView(icon, lp(dp(34), dp(34)));
+        TextView name = label(String.valueOf(ri.loadLabel(pm)), 12, INK, true);
+        name.setSingleLine(true);
+        name.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        LinearLayout.LayoutParams nameParams = new LinearLayout.LayoutParams(0, -2, 1f);
+        nameParams.leftMargin = dp(10);
+        tile.addView(name, nameParams);
+        TextView arrow = label("›", 23, RED, false);
+        tile.addView(arrow);
+
+        LinearLayout.LayoutParams params = lp(-1, dp(compact ? 50 : 48));
+        params.topMargin = dp(9);
+        parent.addView(tile, params);
+    }
+
+    private void showAllApps() {
+        List<ResolveInfo> apps = getApps();
+        PackageManager pm = getPackageManager();
+        ScrollView scroll = new ScrollView(this);
+        scroll.setBackgroundColor(BG);
+        LinearLayout list = column();
+        list.setPadding(dp(20), dp(16), dp(20), dp(20));
+        scroll.addView(list);
+        for (ResolveInfo ri : apps) addAppTile(list, ri, pm, true);
+        TextView title = label("ALL APPS", 18, INK, true);
+        title.setPadding(dp(20), dp(18), dp(20), dp(8));
+        new AlertDialog.Builder(this)
+            .setCustomTitle(title)
+            .setView(scroll)
+            .setNegativeButton("CLOSE", (dialog, which) -> dialog.dismiss())
+            .show();
     }
 
     private void launch(String pkg) {
@@ -319,8 +358,7 @@ public class MainActivity extends Activity {
 
     @Override public boolean dispatchKeyEvent(KeyEvent event) {
         if (event.getAction() == KeyEvent.ACTION_DOWN && event.getKeyCode() == KeyEvent.KEYCODE_MENU) {
-            View first = dock != null && dock.getChildCount() > 0 ? dock.getChildAt(0) : null;
-            if (first != null) first.requestFocus();
+            showAllApps();
             return true;
         }
         return super.dispatchKeyEvent(event);
