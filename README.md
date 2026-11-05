@@ -30,6 +30,7 @@ This repository currently contains the product plan and engineering documentatio
 
 ## Documentation
 
+- [Project status note](PROJECT-NOTE.md)
 - [Product and development plan](docs/PROJECT_PLAN.md)
 - [V1.0 requirements and acceptance criteria](docs/V1_SCOPE.md)
 - [Architecture](docs/ARCHITECTURE.md)
@@ -38,6 +39,11 @@ This repository currently contains the product plan and engineering documentatio
 - [Roadmap](docs/ROADMAP.md)
 - [Installation, recovery and backup expectations](docs/RECOVERY.md)
 - [Changelog](CHANGELOG.md)
+
+## Download as ZIP
+
+GitHub automatically provides a ZIP snapshot of the current repository:
+[Download Friday Pi Connect source and documentation (ZIP)](https://github.com/jarvisbyak-pack/Friday-Pi-Connect/archive/refs/heads/main.zip).
 
 ## Future direction
 
